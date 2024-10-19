@@ -47,8 +47,3 @@ struct SignInView: View {
     }
 }
 
-struct ErrorWrapper: Identifiable {
-    let id = UUID()
-    let error: String
-}
-

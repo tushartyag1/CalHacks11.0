@@ -19,7 +19,7 @@ struct TripDetailView: View {
     var body: some View {
         List {
             Section(header: Text("Trip Details")) {
-                Text("City: \(viewModel.trip?.city ?? "")")
+                Text("Place: \(viewModel.trip?.place.name ?? "")")
                 Text("Duration: \(viewModel.trip?.duration ?? 0) days")
                 Text("Participants: \(viewModel.trip?.participants.count ?? 0)")
             }

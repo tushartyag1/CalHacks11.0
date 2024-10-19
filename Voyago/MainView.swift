@@ -20,7 +20,7 @@ struct MainView: View {
                 Section(header: Text("Your Trips")) {
                     ForEach(viewModel.trips) { trip in
                         NavigationLink(destination: TripDetailView(tripId: trip.id)) {
-                            Text(trip.city)
+                            Text(trip.place.name)
                         }
                     }
                 }

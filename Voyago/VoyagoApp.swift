@@ -11,11 +11,19 @@ import GooglePlaces
 
 struct PlistReader {
     static func value(for key: String) -> String? {
-        guard let path = Bundle.main.path(forResource: "Keys", ofType: "plist"),
-              let dict = NSDictionary(contentsOfFile: path) as? [String: AnyObject] else {
+        guard let path = Bundle.main.path(forResource: "Keys", ofType: "plist") else {
+            print("Keys.plist file not found")
             return nil
         }
-        return dict[key] as? String
+        guard let dict = NSDictionary(contentsOfFile: path) as? [String: AnyObject] else {
+            print("Failed to load Keys.plist as dictionary")
+            return nil
+        }
+        guard let value = dict[key] as? String else {
+            print("Key '\(key)' not found in Keys.plist or value is not a string")
+            return nil
+        }
+        return value
     }
 }
 
@@ -24,8 +32,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
         
+        print("Attempting to load Google Places API Key")
         if let apiKey = PlistReader.value(for: "GOOGLE_PLACES_API_KEY") {
+            print("Google Places API Key loaded successfully")
             GMSPlacesClient.provideAPIKey(apiKey)
+            print("API Key provided to GMSPlacesClient")
         } else {
             print("Failed to load Google Places API Key")
         }
@@ -52,9 +63,7 @@ struct VoyagoApp: App {
                             ContentView()
                         }
                     }
-                case .newAccount:
-                    SignInView()
-                case .signedOut:
+                case .newAccount, .signedOut:
                     SignInView()
                 }
             }

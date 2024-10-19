@@ -166,4 +166,13 @@ class TripManager {
             "participants": FieldValue.arrayUnion([userId])
         ], completion: completion)
     }
+    
+    func updateSharedNotes(tripId: String, notes: String, completion: @escaping (Error?) -> Void) {
+        let tripRef = db.collection("trips").document(tripId)
+        tripRef.updateData([
+            "sharedNotes": notes
+        ]) { error in
+            completion(error)
+        }
+    }
 }

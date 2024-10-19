@@ -11,106 +11,155 @@ import GooglePlaces
 
 struct CreateTripView: View {
     @Environment(\.presentationMode) var presentationMode
-    @State private var searchText = ""
-    @State private var selectedPlace: GMSPlace?
-    @State private var duration = 1
-    @State private var showingInviteView = false
-    @State private var tripId: String?
-    @State private var errorMessage: String?
-    @State private var predictions: [GMSAutocompletePrediction] = []
-    
-    private let tripManager = TripManager()
+    @StateObject private var viewModel = CreateTripViewModel()
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Search for a Place")) {
-                    TextField("Search", text: $searchText)
-                        .onChange(of: searchText) { newValue in
-                            searchPlaces(query: newValue)
-                        }
-                    
-                    if !predictions.isEmpty {
-                        List(predictions, id: \.placeID) { prediction in
-                            Button(action: {
-                                fetchPlaceDetails(placeID: prediction.placeID)
-                            }) {
-                                VStack(alignment: .leading) {
-                                    Text(prediction.attributedPrimaryText.string)
-                                        .font(.headline)
-                                    Text(prediction.attributedSecondaryText?.string ?? "")
-                                        .font(.subheadline)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                if let place = selectedPlace {
-                    Section(header: Text("Selected Place")) {
-                        Text(place.name ?? "")
-                        Text(place.formattedAddress ?? "")
-                        if let photos = place.photos, !photos.isEmpty {
-                            PlacePhotoView(photoMetadata: photos[0])
-                                .frame(height: 200)
-                        }
-                        if let types = place.types {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    ForEach(types, id: \.self) { type in
-                                        Text(type.rawValue)
-                                            .padding(5)
-                                            .background(Color.blue.opacity(0.1))
-                                            .cornerRadius(5)
-                                    }
-                                }
-                            }
-                        }
-                        if let priceLevel = place.priceLevel {
-                            Text("Price Level: \(String(repeating: "$", count: Int(priceLevel.rawValue)))")
-                        }
-                        if let rating = place.rating {
-                            Text("Rating: \(rating)")
-                        }
-                    }
-                    
-                    Section(header: Text("Trip Details")) {
-                        Stepper("Duration: \(duration) days", value: $duration, in: 1...30)
-                    }
-                    
-                    Button("Create Trip") {
-                        createTrip()
-                    }
-                }
+                searchSection
+                selectedPlaceSection
+                tripDetailsSection
+                createTripButton
             }
             .navigationTitle("Create Trip")
-            .alert(item: Binding(
-                get: { errorMessage.map { ErrorWrapper(error: $0) } },
-                set: { _ in errorMessage = nil }
-            )) { errorWrapper in
+            .alert(item: $viewModel.errorWrapper) { errorWrapper in
                 Alert(title: Text("Error"), message: Text(errorWrapper.error), dismissButton: .default(Text("OK")))
             }
         }
-        .sheet(isPresented: $showingInviteView) {
-            InviteFriendsView(tripId: $tripId)
+        .sheet(isPresented: $viewModel.showingInviteView) {
+            InviteFriendsView(tripId: $viewModel.tripId)
         }
     }
     
-    private func searchPlaces(query: String) {
-        PlacesManager.shared.findPlaces(query: query) { results in
-            self.predictions = results
-        }
-    }
-    
-    private func fetchPlaceDetails(placeID: String) {
-        PlacesManager.shared.fetchPlaceDetails(placeID: placeID) { place in
-            if let place = place {
-                self.selectedPlace = place
+    private var searchSection: some View {
+        Section(header: Text("Search for a Place")) {
+            TextField("Search", text: $viewModel.searchText)
+                .onChange(of: viewModel.searchText) { newValue in
+                    viewModel.searchPlaces(query: newValue)
+                }
+            
+            if !viewModel.predictions.isEmpty {
+                ForEach(viewModel.predictions, id: \.placeID) { prediction in
+                    Button(action: {
+                        viewModel.fetchPlaceDetails(placeID: prediction.placeID)
+                    }) {
+                        VStack(alignment: .leading) {
+                            Text(prediction.attributedPrimaryText.string)
+                                .font(.headline)
+                            Text(prediction.attributedSecondaryText?.string ?? "")
+                                .font(.subheadline)
+                        }
+                    }
+                }
             }
         }
     }
     
-    private func createTrip() {
+    private var selectedPlaceSection: some View {
+        Group {
+            if let place = viewModel.selectedPlace {
+                Section(header: Text("Selected Place")) {
+                    Text(place.name ?? "")
+                    Text(place.formattedAddress ?? "")
+                    if let photos = place.photos, !photos.isEmpty {
+                        PlacePhotoView(photoMetadata: photos[0])
+                            .frame(height: 200)
+                    }
+                    placeTypesView(for: place)
+                    priceLevelView(for: place)
+                    ratingView(for: place)
+                }
+            }
+        }
+    }
+    
+    private func placeTypesView(for place: GMSPlace) -> some View {
+        Group {
+            if let types = place.types {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        ForEach(types, id: \.self) { type in
+                            Text(type)
+                                .padding(5)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(5)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func priceLevelView(for place: GMSPlace) -> some View {
+        Group {
+            let priceLevel = place.priceLevel
+            Text("Price Level: \(String(repeating: "$", count: Int(priceLevel.rawValue)))")
+        }
+    }
+
+    private func ratingView(for place: GMSPlace) -> some View {
+        Group {
+            let rating = place.rating
+            if rating > 0 {
+                Text("Rating: \(String(format: "%.1f", rating))")
+            } else {
+                Text("No rating available")
+            }
+        }
+    }
+    
+    private var tripDetailsSection: some View {
+        Group {
+            if viewModel.selectedPlace != nil {
+                Section(header: Text("Trip Details")) {
+                    Stepper("Duration: \(viewModel.duration) days", value: $viewModel.duration, in: 1...30)
+                }
+            }
+        }
+    }
+    
+    private var createTripButton: some View {
+        Group {
+            if viewModel.selectedPlace != nil {
+                Button("Create Trip") {
+                    viewModel.createTrip()
+                }
+            }
+        }
+    }
+}
+
+class CreateTripViewModel: ObservableObject {
+    @Published var searchText = ""
+    @Published var selectedPlace: GMSPlace?
+    @Published var duration = 1
+    @Published var showingInviteView = false
+    @Published var tripId: String?
+    @Published var errorWrapper: ErrorWrapper?
+    @Published var predictions: [GMSAutocompletePrediction] = []
+    
+    private let tripManager = TripManager()
+    private let placesManager = PlacesManager.shared
+    
+    func searchPlaces(query: String) {
+        placesManager.findPlaces(query: query) { results in
+            DispatchQueue.main.async {
+                self.predictions = results
+            }
+        }
+    }
+    
+    func fetchPlaceDetails(placeID: String) {
+        placesManager.fetchPlaceDetails(placeID: placeID) { place in
+            DispatchQueue.main.async {
+                if let place = place {
+                    self.selectedPlace = place
+                }
+            }
+        }
+    }
+    
+    func createTrip() {
         guard let userId = Auth.auth().currentUser?.uid, let place = selectedPlace else {
             print("No user ID found or no place selected")
             return
@@ -121,14 +170,14 @@ struct CreateTripView: View {
             DispatchQueue.main.async {
                 if let error = error {
                     print("Error creating trip: \(error.localizedDescription)")
-                    self.errorMessage = "Error creating trip: \(error.localizedDescription)"
+                    self.errorWrapper = ErrorWrapper(error: error.localizedDescription)
                 } else if let newTripId = newTripId {
                     print("Trip created successfully with ID: \(newTripId)")
                     self.tripId = newTripId
                     self.showingInviteView = true
                 } else {
                     print("Unknown error: No trip ID returned and no error")
-                    self.errorMessage = "Unknown error occurred"
+                    self.errorWrapper = ErrorWrapper(error: "Unknown error occurred")
                 }
             }
         }
