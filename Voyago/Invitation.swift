@@ -21,28 +21,18 @@ struct Invitation: Identifiable, Codable {
 class InvitationManager {
     private let db = Firestore.firestore()
     
-<<<<<<< HEAD
     func sendInvitation(tripId: String, inviterId: String, inviterName: String, inviteeEmail: String, tripName: String, completion: @escaping (Error?) -> Void) {
-=======
-    func sendInvitation(tripId: String, inviterId: String, inviteeEmail: String, tripName: String, completion: @escaping (Error?) -> Void) {
-        // Get the invitee's user ID from their email
->>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
         getUserIdFromEmail(inviteeEmail) { [weak self] inviteeId in
             guard let inviteeId = inviteeId else {
                 completion(NSError(domain: "InvitationManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Invitee not found"]))
                 return
             }
             
-            // We already have the inviter's ID, no need to fetch it
             let invitation = Invitation(
                 id: UUID().uuidString,
                 tripId: tripId,
-<<<<<<< HEAD
                 inviterId: inviterId,
                 inviterName: inviterName,
-=======
-                inviterId: inviterId,  // Use the inviterId directly
->>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
                 inviteeId: inviteeId,
                 status: "pending",
                 tripName: tripName
@@ -50,84 +40,26 @@ class InvitationManager {
         
             do {
                 try self?.db.collection("invitations").document(invitation.id).setData(from: invitation) { error in
-                    if let error = error {
-                        print("Error saving invitation: \(error.localizedDescription)")
-                        completion(error)
-                    } else {
-                        print("Invitation saved successfully: \(invitation)")
-                        self?.addInvitationToTrip(tripId: tripId, invitationId: invitation.id) { error in
-                            completion(error)
-                        }
-                    }
+                    completion(error)
                 }
             } catch {
-                print("Error encoding invitation: \(error.localizedDescription)")
                 completion(error)
             }
         }
     }
     
-    func listenForTripInvitations(tripId: String, completion: @escaping ([Invitation]) -> Void) -> ListenerRegistration {
-        print("Listening for invitations for trip: \(tripId)")
-        return db.collection("invitations")
-            .whereField("tripId", isEqualTo: tripId)
-            .addSnapshotListener { querySnapshot, error in
-                if let error = error {
-                    print("Error fetching trip invitations: \(error.localizedDescription)")
-                    completion([])
-                    return
-                }
-                
-                guard let documents = querySnapshot?.documents else {
-                    print("No invitation documents found for trip")
-                    completion([])
-                    return
-                }
-                
-                print("Found \(documents.count) invitation documents for trip")
-                let invitations = documents.compactMap { document -> Invitation? in
-                    do {
-                        let invitation = try document.data(as: Invitation.self)
-                        print("Parsed trip invitation: \(invitation)")
-                        return invitation
-                    } catch {
-                        print("Error parsing trip invitation document: \(error.localizedDescription)")
-                        return nil
-                    }
-                }
-                completion(invitations)
-            }
-    }
-    
     func listenForInvitations(userId: String, completion: @escaping ([Invitation]) -> Void) -> ListenerRegistration {
-        print("Listening for invitations for user: \(userId)")
         return db.collection("invitations")
             .whereField("inviteeId", isEqualTo: userId)
             .whereField("status", isEqualTo: "pending")
             .addSnapshotListener { querySnapshot, error in
-                if let error = error {
-                    print("Error fetching user invitations: \(error.localizedDescription)")
-                    completion([])
-                    return
-                }
-                
                 guard let documents = querySnapshot?.documents else {
-                    print("No invitation documents found for user")
+                    print("Error fetching invitations: \(error?.localizedDescription ?? "Unknown error")")
                     completion([])
                     return
                 }
                 
-                print("Found \(documents.count) invitation documents for user")
-                let invitations = documents.compactMap { document -> Invitation? in
-                    do {
-                        let invitation = try document.data(as: Invitation.self)
-                        print("Parsed user invitation: \(invitation)")
-                        return invitation
-                    } catch {
-                        print("Error parsing user invitation document: \(error.localizedDescription)")
-                        return nil
-                    }
-                }
+                let invitations = documents.compactMap { try? $0.data(as: Invitation.self) }
                 completion(invitations)
             }
     }
@@ -139,27 +71,12 @@ class InvitationManager {
     
     private func getUserIdFromEmail(_ email: String, completion: @escaping (String?) -> Void) {
         db.collection("users").whereField("email", isEqualTo: email).getDocuments { (querySnapshot, error) in
-            if let error = error {
-                print("Error getting user: \(error.localizedDescription)")
+            guard let documents = querySnapshot?.documents, !documents.isEmpty else {
                 completion(nil)
                 return
             }
-            
-            guard let document = querySnapshot?.documents.first else {
-                print("No user found with email: \(email)")
-                completion(nil)
-                return
-            }
-            
-            let userId = document.documentID
-            print("Found user ID: \(userId) for email: \(email)")
+            let userId = documents[0].documentID
             completion(userId)
         }
-    }
-    
-    private func addInvitationToTrip(tripId: String, invitationId: String, completion: @escaping (Error?) -> Void) {
-        db.collection("trips").document(tripId).updateData([
-            "invitations": FieldValue.arrayUnion([invitationId])
-        ], completion: completion)
     }
 }

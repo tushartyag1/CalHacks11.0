@@ -55,69 +55,21 @@ struct TripDetailView: View {
                 }
             }
             
-            Section(header: Text("Participants")) {
-                ForEach(viewModel.participantStatuses.sorted(by: { $0.key < $1.key }), id: \.key) { userId, status in
-                    HStack {
-                        Text(viewModel.getUserName(for: userId))
-                        Spacer()
-                        Text(statusText(for: status))
-                            .foregroundColor(statusColor(for: status))
-                    }
-                }
-                if viewModel.isCreator {
-                    Button("Invite Friend") {
-                        showingInviteView = true
-                    }
-                }
-            }
-            
             if viewModel.currentUserStatus == .accepted || viewModel.currentUserStatus == .notStarted {
-                Section {
-                    Button("Submit Preferences") {
-                        showingPreferencesView = true
+                            Section {
+                                Button("Submit Preferences") {
+                                    showingPreferencesView = true
+                                }
+                            }
+                        }
                     }
-                }
-            }
-        }
-        .navigationTitle("Trip Details")
-        .onAppear {
-            viewModel.loadTrip(tripId: tripId)
-            viewModel.loadParticipantStatuses()
-        }
-    }
-    
-    func statusText(for status: ParticipantStatus) -> String {
-        switch status {
-        case .inviteSent:
-            return "Invite Sent"
-        case .invited:
-            return "Invited"
-        case .accepted:
-            return "Accepted"
-        case .rejected:
-            return "Rejected"
-        case .notStarted:
-            return "Not Started"
-        case .inProgress:
-            return "In Progress"
-        case .completed:
-            return "Completed"
-        }
-    }
-    
-    func statusColor(for status: ParticipantStatus) -> Color {
-        switch status {
-        case .inviteSent, .invited:
-            return .blue
-        case .accepted, .notStarted:
-            return .orange
-        case .rejected:
-            return .red
-        case .inProgress:
-            return .yellow
-        case .completed:
-            return .green
-        }
+                    .navigationTitle("Trip Details")
+                    .onAppear {
+                        viewModel.loadTrip(tripId: tripId)
+                    }
+                    .sheet(isPresented: $showingPreferencesView) {
+                        TripPreferencesView(tripId: tripId, userId: Auth.auth().currentUser?.uid ?? "")
+                    }
     }
 }
 
@@ -149,27 +101,10 @@ class TripDetailViewModel: ObservableObject {
     func loadTrip(tripId: String) {
         tripListener = tripManager.listenForTripUpdates(tripId: tripId) { [weak self] trip in
             self?.trip = trip
-            self?.loadParticipantStatuses()
         }
         
         itineraryListener = itineraryManager.listenForItineraryUpdates(tripId: tripId) { [weak self] items in
             self?.itineraryItems = items
-        }
-    }
-    
-    func loadParticipantStatuses() {
-        guard let tripId = trip?.id else { return }
-        
-        statusListener = tripDetailsManager.listenForTripDetailsStatus(tripId: tripId) { [weak self] statuses in
-            DispatchQueue.main.async {
-                self?.updateParticipantStatuses(with: statuses)
-            }
-        }
-        
-        invitationListener = invitationManager.listenForTripInvitations(tripId: tripId) { [weak self] invitations in
-            DispatchQueue.main.async {
-                self?.updateInvitationStatuses(with: invitations)
-            }
         }
     }
     
@@ -228,25 +163,6 @@ class TripDetailViewModel: ObservableObject {
         }
     }
     
-<<<<<<< HEAD
-=======
-    func inviteFriend(email: String, completion: @escaping (Bool) -> Void) {
-        guard let tripId = trip?.id, let inviterId = Auth.auth().currentUser?.uid else {
-            completion(false)
-            return
-        }
-        
-        invitationManager.sendInvitation(tripId: tripId, inviterId: inviterId, inviteeEmail: email, tripName: trip?.place.name ?? "") { [weak self] error in
-            if let error = error {
-                print("Error sending invitation: \(error.localizedDescription)")
-            } else {
-                print("Invitation sent successfully")
-            }
-        }
-
-    }
-    
->>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
     func submitPreferences(preferences: TripDetails) {
         tripDetailsManager.updateTripDetails(tripDetails: preferences) { [weak self] error in
             if let error = error {

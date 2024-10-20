@@ -94,5 +94,3 @@ struct SelectedCityView: View {
         }
     }
 }
-
-// ... (rest of the SelectedCityView.swift file remains the same)

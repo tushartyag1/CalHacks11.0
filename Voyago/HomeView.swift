@@ -87,10 +87,10 @@ struct HomeView: View {
         .sheet(isPresented: $showingCreateTripView) {
             CreateTripView()
         }
-//        .sheet(isPresented: $showingNotificationsView) {
-//                    NotificationsView(viewModel: viewModel)
-//                        .presentationDetents([.medium, .large], selection: $notificationDetent)
-//                }
+        .sheet(isPresented: $showingNotificationsView) {
+                    NotificationsView()
+                        .presentationDetents([.medium, .large], selection: $notificationDetent)
+                }
         .alert(isPresented: $showingSignOutAlert) {
             Alert(
                 title: Text("Sign Out"),
