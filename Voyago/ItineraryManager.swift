@@ -17,8 +17,7 @@ class ItineraryManager {
             "creatorId": creatorId,
             "title": title,
             "description": description,
-            "date": date,
-            "votes": [:]
+            "date": date
         ]) { error in
             if let error = error {
                 completion(nil, error)
@@ -26,13 +25,6 @@ class ItineraryManager {
                 completion(itemRef.documentID, nil)
             }
         }
-    }
-    
-    func voteForItem(itemId: String, userId: String, upvote: Bool, completion: @escaping (Error?) -> Void) {
-        let itemRef = db.collection("itineraryItems").document(itemId)
-        itemRef.updateData([
-            "votes.\(userId)": upvote
-        ], completion: completion)
     }
     
     func listenForItineraryUpdates(tripId: String, completion: @escaping ([ItineraryItem]) -> Void) -> ListenerRegistration {
@@ -51,8 +43,7 @@ class ItineraryManager {
                         creatorId: data["creatorId"] as? String ?? "",
                         title: data["title"] as? String ?? "",
                         description: data["description"] as? String ?? "",
-                        date: (data["date"] as? Timestamp)?.dateValue() ?? Date(),
-                        votes: data["votes"] as? [String: Bool] ?? [:]
+                        date: (data["date"] as? Timestamp)?.dateValue() ?? Date()
                     )
                 }
                 completion(items)

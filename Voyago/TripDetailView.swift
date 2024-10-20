@@ -39,16 +39,6 @@ struct TripDetailView: View {
                         Text(item.title).font(.headline)
                         Text(item.description).font(.subheadline)
                         Text(item.date, style: .date)
-                        HStack {
-                            Button(action: { viewModel.voteForItem(item.id, upvote: true) }) {
-                                Image(systemName: "hand.thumbsup")
-                            }
-                            Text("\(item.votes.filter { $0.value }.count)")
-                            Button(action: { viewModel.voteForItem(item.id, upvote: false) }) {
-                                Image(systemName: "hand.thumbsdown")
-                            }
-                            Text("\(item.votes.filter { !$0.value }.count)")
-                        }
                     }
                 }
             }
@@ -93,12 +83,6 @@ struct TripDetailView: View {
         .onAppear {
             viewModel.loadTrip(tripId: tripId)
             viewModel.loadParticipantStatuses()
-        }
-        
-        .sheet(isPresented: $showingInviteView) {
-            InviteFriendsView(tripId: tripId) { email, completion in
-                viewModel.inviteFriend(email: email, completion: completion)
-            }
         }
     }
     
@@ -146,7 +130,7 @@ class TripDetailViewModel: ObservableObject {
     private let itineraryManager = ItineraryManager()
     private let tripDetailsManager = TripDetailsManager()
     private let invitationManager = InvitationManager()
-    private let userProfileManager = UserProfileManager()
+    private let userManager = UserManager()
     private var tripListener: ListenerRegistration?
     private var itineraryListener: ListenerRegistration?
     private var statusListener: ListenerRegistration?
@@ -235,37 +219,11 @@ class TripDetailViewModel: ObservableObject {
         }
     }
     
-    func voteForItem(_ itemId: String, upvote: Bool) {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        itineraryManager.voteForItem(itemId: itemId, userId: userId, upvote: upvote) { error in
-            if let error = error {
-                print("Error voting for item: \(error.localizedDescription)")
-            }
-        }
-    }
-    
     func updateUserStatus(to status: ParticipantStatus) {
         guard let userId = Auth.auth().currentUser?.uid, let tripId = trip?.id else { return }
         tripDetailsManager.updateUserStatus(userId: userId, tripId: tripId, status: status) { error in
             if let error = error {
                 print("Error updating user status: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    func inviteFriend(email: String, completion: @escaping (Bool) -> Void) {
-        guard let tripId = trip?.id, let inviterId = Auth.auth().currentUser?.uid else {
-            completion(false)
-            return
-        }
-        
-        invitationManager.sendInvitation(tripId: tripId, inviterEmail: inviterId, inviteeEmail: email, tripName: trip?.place.name ?? "") { [weak self] error in
-            if let error = error {
-                print("Error sending invitation: \(error.localizedDescription)")
-                completion(false)
-            } else {
-                self?.participantStatuses[email] = .inviteSent
-                completion(true)
             }
         }
     }

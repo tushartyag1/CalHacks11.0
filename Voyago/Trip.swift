@@ -14,7 +14,6 @@ struct PlaceDetails: Codable {
     // Add any other properties that you expect to be in the place data
     // If some properties might be missing, make them optional with '?'
     
-    // Custom coding keys in case the Firebase data uses different key names
     enum CodingKeys: String, CodingKey {
         case name
         case formattedAddress = "formatted_address"
@@ -22,8 +21,8 @@ struct PlaceDetails: Codable {
     }
 }
 
-struct Trip: Identifiable {
-    let id: String
+struct Trip: Identifiable, Codable {
+    @DocumentID var id: String?
     let creatorId: String
     let place: PlaceDetails
     let startDate: Date
@@ -31,6 +30,17 @@ struct Trip: Identifiable {
     var participants: [String]
     var itinerary: [String]
     var sharedNotes: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case creatorId
+        case place
+        case startDate
+        case endDate
+        case participants
+        case itinerary
+        case sharedNotes
+    }
     
     var formattedDuration: String {
         let formatter = DateFormatter()
@@ -45,28 +55,33 @@ class TripManager {
     func createTrip(creatorId: String, place: GMSPlace, startDate: Date, endDate: Date, completion: @escaping (String?, Error?) -> Void) {
         let tripRef = db.collection("trips").document()
         
-        let placeData: [String: Any] = [
-            "name": place.name ?? "",
-            "formatted_address": place.formattedAddress ?? "",
+        let placeDetails = PlaceDetails(
+            name: place.name,
+            formattedAddress: place.formattedAddress
             // Add any other place details you want to save
-        ]
+        )
         
-        let data: [String: Any] = [
-            "creatorId": creatorId,
-            "place": placeData,
-            "startDate": Timestamp(date: startDate),
-            "endDate": Timestamp(date: endDate),
-            "participants": [creatorId],
-            "itinerary": [],
-            "sharedNotes": ""
-        ]
+        let trip = Trip(
+            id: tripRef.documentID,
+            creatorId: creatorId,
+            place: placeDetails,
+            startDate: startDate,
+            endDate: endDate,
+            participants: [creatorId],
+            itinerary: [],
+            sharedNotes: ""
+        )
         
-        tripRef.setData(data) { error in
-            if let error = error {
-                completion(nil, error)
-            } else {
-                completion(tripRef.documentID, nil)
+        do {
+            try tripRef.setData(from: trip) { error in
+                if let error = error {
+                    completion(nil, error)
+                } else {
+                    completion(tripRef.documentID, nil)
+                }
             }
+        } catch {
+            completion(nil, error)
         }
     }
     
@@ -78,30 +93,12 @@ class TripManager {
                 completion(nil)
                 return
             }
-            guard let data = document.data() else {
-                print("Document data was empty.")
-                completion(nil)
-                return
-            }
+            
             do {
-                let placeData = data["place"] as? [String: Any] ?? [:]
-                print("Place data: \(placeData)") // Debug print
-                let placeDetails = try Firestore.Decoder().decode(PlaceDetails.self, from: placeData)
-                
-                let trip = Trip(
-                    id: tripId,
-                    creatorId: data["creatorId"] as? String ?? "",
-                    place: placeDetails,
-                    startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
-                    endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
-                    participants: data["participants"] as? [String] ?? [],
-                    itinerary: data["itinerary"] as? [String] ?? [],
-                    sharedNotes: data["sharedNotes"] as? String ?? ""
-                )
+                let trip = try document.data(as: Trip.self)
                 completion(trip)
             } catch {
-                print("Error decoding place details: \(error)")
-                print("Raw place data: \(data["place"] ?? "No place data")")
+                print("Error decoding trip: \(error.localizedDescription)")
                 completion(nil)
             }
         }
@@ -113,28 +110,12 @@ class TripManager {
             .addSnapshotListener { querySnapshot, error in
                 guard let documents = querySnapshot?.documents else {
                     print("Error fetching documents: \(error?.localizedDescription ?? "Unknown error")")
+                    completion([])
                     return
                 }
+                
                 let trips = documents.compactMap { document -> Trip? in
-                    let data = document.data()
-                    do {
-                        let placeData = data["place"] as? [String: Any] ?? [:]
-                        let placeDetails = try Firestore.Decoder().decode(PlaceDetails.self, from: placeData)
-                        
-                        return Trip(
-                            id: document.documentID,
-                            creatorId: data["creatorId"] as? String ?? "",
-                            place: placeDetails,
-                            startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
-                            endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
-                            participants: data["participants"] as? [String] ?? [],
-                            itinerary: data["itinerary"] as? [String] ?? [],
-                            sharedNotes: data["sharedNotes"] as? String ?? ""
-                        )
-                    } catch {
-                        print("Error decoding place details for trip \(document.documentID): \(error)")
-                        return nil
-                    }
+                    try? document.data(as: Trip.self)
                 }
                 completion(trips)
             }
@@ -151,8 +132,38 @@ class TripManager {
         let tripRef = db.collection("trips").document(tripId)
         tripRef.updateData([
             "sharedNotes": notes
-        ]) { error in
-            completion(error)
+        ], completion: completion)
+    }
+    
+    func fetchTrip(tripId: String, completion: @escaping (Result<Trip, Error>) -> Void) {
+        db.collection("trips").document(tripId).getDocument { (document, error) in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let document = document, document.exists else {
+                completion(.failure(NSError(domain: "TripManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Trip not found"])))
+                return
+            }
+            
+            do {
+                let trip = try document.data(as: Trip.self)
+                completion(.success(trip))
+            } catch {
+                print("Error decoding trip: \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    func deleteTrip(tripId: String, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        db.collection("trips").document(tripId).delete { error in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
         }
     }
 }

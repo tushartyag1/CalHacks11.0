@@ -55,14 +55,7 @@ struct VoyagoApp: App {
             Group {
                 switch authManager.authState {
                 case .signedIn:
-                    TabView {
-                        Tab("Gemini", systemImage: "tray.and.arrow.down.fill") {
-                            MainView()
-                        }
-                        Tab("Gemini", systemImage: "tray.and.arrow.down.fill") {
-                            ContentView()
-                        }
-                    }
+                    HomeView()
                 case .newAccount, .signedOut:
                     SignInView()
                 }

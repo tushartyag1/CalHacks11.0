@@ -14,5 +14,4 @@ struct ItineraryItem: Identifiable {
     var title: String
     var description: String
     var date: Date
-    var votes: [String: Bool] // userId: vote (true for upvote, false for downvote)
 }

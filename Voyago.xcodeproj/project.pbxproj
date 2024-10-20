@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		45265C132CC4D58A00D60E1E /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 45265C122CC4D58A00D60E1E /* Glur */; };
 		4591FCB12CC3E7AE003757D2 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = 4591FCB02CC3E7AE003757D2 /* GoogleGenerativeAI */; };
 		4591FCB92CC3F71F003757D2 /* GooglePlacesSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 4591FCB82CC3F71F003757D2 /* GooglePlacesSwift */; };
 		45CAA6DF2CC3A5B2007BC90D /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 45CAA6DE2CC3A5B2007BC90D /* FirebaseAnalytics */; };
@@ -18,9 +19,22 @@
 		45CAA6CA2CC3A36E007BC90D /* Voyago.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voyago.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		45265C6E2CC5120900D60E1E /* Exceptions for "Voyago" folder in "Voyago" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 45CAA6C92CC3A36E007BC90D /* Voyago */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		45CAA6CC2CC3A36E007BC90D /* Voyago */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				45265C6E2CC5120900D60E1E /* Exceptions for "Voyago" folder in "Voyago" target */,
+			);
 			path = Voyago;
 			sourceTree = "<group>";
 		};
@@ -33,6 +47,7 @@
 			files = (
 				45CAA6DF2CC3A5B2007BC90D /* FirebaseAnalytics in Frameworks */,
 				4591FCB92CC3F71F003757D2 /* GooglePlacesSwift in Frameworks */,
+				45265C132CC4D58A00D60E1E /* Glur in Frameworks */,
 				45CAA6F22CC3ABE8007BC90D /* FirebaseAuth in Frameworks */,
 				45CAA6F02CC3ABE0007BC90D /* FirebaseFirestore in Frameworks */,
 				4591FCB12CC3E7AE003757D2 /* GoogleGenerativeAI in Frameworks */,
@@ -91,6 +106,7 @@
 				45CAA6F12CC3ABE8007BC90D /* FirebaseAuth */,
 				4591FCB02CC3E7AE003757D2 /* GoogleGenerativeAI */,
 				4591FCB82CC3F71F003757D2 /* GooglePlacesSwift */,
+				45265C122CC4D58A00D60E1E /* Glur */,
 			);
 			productName = Voyago;
 			productReference = 45CAA6CA2CC3A36E007BC90D /* Voyago.app */;
@@ -124,6 +140,7 @@
 				45CAA6DD2CC3A5B2007BC90D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				4591FCAF2CC3E7AE003757D2 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
 				4591FCB72CC3F71F003757D2 /* XCRemoteSwiftPackageReference "ios-places-swift-sdk" */,
+				45265C112CC4D58A00D60E1E /* XCRemoteSwiftPackageReference "Glur" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 45CAA6CB2CC3A36E007BC90D /* Products */;
@@ -287,6 +304,7 @@
 				DEVELOPMENT_TEAM = LJW827W979;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Voyago/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Voyago;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -322,6 +340,7 @@
 				DEVELOPMENT_TEAM = LJW827W979;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Voyago/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Voyago;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -369,6 +388,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		45265C112CC4D58A00D60E1E /* XCRemoteSwiftPackageReference "Glur" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/joogps/Glur.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.4;
+			};
+		};
 		4591FCAF2CC3E7AE003757D2 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google-gemini/generative-ai-swift.git";
@@ -396,6 +423,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		45265C122CC4D58A00D60E1E /* Glur */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 45265C112CC4D58A00D60E1E /* XCRemoteSwiftPackageReference "Glur" */;
+			productName = Glur;
+		};
 		4591FCB02CC3E7AE003757D2 /* GoogleGenerativeAI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4591FCAF2CC3E7AE003757D2 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;

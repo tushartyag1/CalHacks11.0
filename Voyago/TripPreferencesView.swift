@@ -5,7 +5,6 @@
 //  Created by Krishna Babani on 10/19/24.
 //
 
-
 import SwiftUI
 
 struct TripPreferencesView: View {

@@ -5,11 +5,17 @@
 //  Created by Krishna Babani on 10/19/24.
 //
 
+//
+//  CreateTripView.swift
+//  Voyago
+//
+//  Created by Krishna Babani on 10/19/24.
+//
+
 import SwiftUI
 import FirebaseAuth
 import GooglePlaces
-
-// MARK: - CreateTripView
+import ContactsUI
 
 struct CreateTripView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -17,145 +23,89 @@ struct CreateTripView: View {
     
     var body: some View {
         NavigationView {
-            Form {
+            VStack(alignment: .leading, spacing: 5) {
                 searchSection
-                selectedPlaceSection
-                tripDetailsSection
-                createTripButton
+                    .padding(.horizontal)
+                    .padding(.top, 20)
                 
-                if !viewModel.invitations.isEmpty {
-                    Section(header: Text("Invitations Sent")) {
-                        ForEach(viewModel.invitations, id: \.self) { email in
-                            Text(email)
+                if !viewModel.predictions.isEmpty {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 15) {
+                            ForEach(viewModel.predictions, id: \.placeID) { prediction in
+                                NavigationLink(
+                                    destination: SelectedCityView(
+                                        placeID: prediction.placeID,
+                                        viewModel: viewModel
+                                    ),
+                                    label: {
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(prediction.attributedPrimaryText.string)
+                                                .font(.custom("ClashDisplay-Medium", size: 24))
+                                                .foregroundColor(.primary)
+                                            Text(prediction.attributedSecondaryText?.string ?? "")
+                                                .font(.custom("ClashDisplay-Regular", size: 18))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                )
+                                .padding(.vertical, 5)
+                            }
                         }
+                        .padding(.horizontal)
                     }
                 }
+                
+                Spacer()
             }
-            .navigationTitle("Create Trip")
-            .alert(item: $viewModel.errorWrapper) { errorWrapper in
-                Alert(title: Text("Error"), message: Text(errorWrapper.error), dismissButton: .default(Text("OK")))
-            }
+            .padding(.top, 30)
+            .navigationBarBackButtonHidden()
         }
-        .sheet(isPresented: $viewModel.showingInviteView) {
-            InviteFriendsView(tripId: viewModel.tripId) { email, completion in
-                viewModel.inviteFriend(email: email, completion: completion)
-            }
+        .navigationViewStyle(StackNavigationViewStyle())
+        .alert(item: $viewModel.errorWrapper) { errorWrapper in
+            Alert(title: Text("Error"), message: Text(errorWrapper.error), dismissButton: .default(Text("OK")))
         }
     }
     
     private var searchSection: some View {
-        Section(header: Text("Search for a City")) {
-            TextField("Enter city name", text: $viewModel.searchText)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Search for a City")
+                .font(.custom("ClashDisplay-Semibold", size: 34))
+                .foregroundColor(.accentColor)
+            
+            CustomSearchBar(text: $viewModel.searchText)
                 .onChange(of: viewModel.searchText) { newValue in
                     viewModel.searchPlaces(query: newValue)
                 }
-            
-            if !viewModel.predictions.isEmpty {
-                ForEach(viewModel.predictions, id: \.placeID) { prediction in
-                    Button(action: {
-                        viewModel.fetchPlaceDetails(placeID: prediction.placeID)
-                    }) {
-                        VStack(alignment: .leading) {
-                            Text(prediction.attributedPrimaryText.string)
-                                .font(.headline)
-                            Text(prediction.attributedSecondaryText?.string ?? "")
-                                .font(.subheadline)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private var selectedPlaceSection: some View {
-        Group {
-            if let place = viewModel.selectedPlace {
-                Section(header: Text("Selected City")) {
-                    Text(place.name ?? "")
-                    Text(place.formattedAddress ?? "")
-                    if let photos = place.photos, !photos.isEmpty {
-                        PlacePhotosView(photoMetadata: Array(photos.prefix(5)))
-                            .frame(height: 200)
-                    }
-                    placeTypesView(for: place)
-                    priceLevelView(for: place)
-                    ratingView(for: place)
-                }
-            }
-        }
-    }
-    
-    private func placeTypesView(for place: GMSPlace) -> some View {
-        Group {
-            if let types = place.types {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(types, id: \.self) { type in
-                            Text(type)
-                                .padding(5)
-                                .background(Color.blue.opacity(0.1))
-                                .cornerRadius(5)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func priceLevelView(for place: GMSPlace) -> some View {
-        Group {
-            let priceLevel = place.priceLevel
-            switch priceLevel {
-            case .free:
-                Text("Price Level: Free")
-            case .cheap:
-                Text("Price Level: $")
-            case .medium:
-                Text("Price Level: $$")
-            case .high:
-                Text("Price Level: $$$")
-            case .expensive:
-                Text("Price Level: $$$$")
-            @unknown default:
-                Text("Price Level: Unknown")
-            }
-        }
-    }
-    
-    private func ratingView(for place: GMSPlace) -> some View {
-        Group {
-            let rating = place.rating
-            if rating > 0 {
-                Text("Rating: \(String(format: "%.1f", rating))")
-            } else {
-                Text("No rating available")
-            }
-        }
-    }
-    
-    private var tripDetailsSection: some View {
-        Group {
-            if viewModel.selectedPlace != nil {
-                Section(header: Text("Trip Details")) {
-                    DatePicker("Start Date", selection: $viewModel.startDate, in: Date()..., displayedComponents: .date)
-                    DatePicker("End Date", selection: $viewModel.endDate, in: viewModel.startDate..., displayedComponents: .date)
-                }
-            }
-        }
-    }
-    
-    private var createTripButton: some View {
-        Group {
-            if viewModel.selectedPlace != nil {
-                Button("Create Trip") {
-                    viewModel.createTrip()
-                }
-            }
         }
     }
 }
 
-// MARK: - CreateTripViewModel
+struct CustomSearchBar: View {
+    @Binding var text: String
+    var placeholder: String = "San Francisco, London, Tokyo, Mumbai, ..."
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.accentColor)
+            
+            TextField(placeholder, text: $text)
+                .font(.custom("ClashDisplay-Regular", size: 18))
+            
+            if !text.isEmpty {
+                Button(action: {
+                    text = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(10)
+    }
+}
 
 class CreateTripViewModel: ObservableObject {
     @Published var searchText = ""
@@ -201,10 +151,11 @@ class CreateTripViewModel: ObservableObject {
     }
     
     func fetchPlaceDetails(placeID: String) {
-        placesManager.fetchPlaceDetails(placeID: placeID) { place in
+        self.selectedPlace = nil // Reset the selected place
+        placesManager.fetchPlaceDetails(placeID: placeID) { [weak self] place in
             DispatchQueue.main.async {
                 if let place = place {
-                    self.selectedPlace = place
+                    self?.selectedPlace = place
                 }
             }
         }
@@ -250,13 +201,13 @@ class CreateTripViewModel: ObservableObject {
     }
     
     func inviteFriend(email: String, completion: @escaping (Bool) -> Void) {
-        guard let creatorId = Auth.auth().currentUser?.uid else {
-            print("No user ID found")
+        guard let creatorId = Auth.auth().currentUser?.uid, let creatorName = Auth.auth().currentUser?.displayName else {
+            print("No user ID or name found")
             completion(false)
             return
         }
         
-        invitationManager.sendInvitation(tripId: self.tripId, inviterEmail: creatorId, inviteeEmail: email, tripName: selectedPlace?.name ?? "") { [weak self] error in
+        invitationManager.sendInvitation(tripId: self.tripId, inviterId: creatorId, inviterName: creatorName, inviteeEmail: email, tripName: selectedPlace?.name ?? "") { [weak self] error in
             if let error = error {
                 print("Error sending invitation: \(error.localizedDescription)")
                 completion(false)
@@ -268,45 +219,150 @@ class CreateTripViewModel: ObservableObject {
     }
 }
 
-// MARK: - InviteFriendsView
-
 struct InviteFriendsView: View {
     let tripId: String
     let inviteFriend: (String, @escaping (Bool) -> Void) -> Void
+    @Environment(\.presentationMode) var presentationMode
     @State private var friendEmail = ""
+    @State private var invitedFriends: [String] = []
     @State private var showingAlert = false
     @State private var alertMessage = ""
-    @Environment(\.presentationMode) var presentationMode
+    @State private var showingContactPicker = false
+    @State private var isInviting = false
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Invite Friends")) {
-                    TextField("Friend's Email", text: $friendEmail)
-                    Button("Send Invite") {
-                        sendInvite()
-                    }
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Invite Friends")
+                .font(.custom("ClashDisplay-Semibold", size: 34))
+                .foregroundColor(.accentColor)
+            
+            HStack {
+                TextField("Enter friend's email", text: $friendEmail)
+                    .font(.custom("ClashDisplay-Regular", size: 18))
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .keyboardType(.emailAddress)
+                
+                Button(action: {
+                    showingContactPicker = true
+                }) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 24))
+                        .foregroundColor(.accentColor)
                 }
             }
-            .navigationTitle("Invite Friends")
-            .navigationBarItems(trailing: Button("Done") {
-                presentationMode.wrappedValue.dismiss()
-            })
-            .alert(isPresented: $showingAlert) {
-                Alert(title: Text("Invitation"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            
+            if !invitedFriends.isEmpty {
+                Text("Invited Friends")
+                    .font(.custom("ClashDisplay-Medium", size: 24))
+                    .padding(.top)
+                
+                ForEach(invitedFriends, id: \.self) { email in
+                    HStack {
+                        Text(email)
+                            .font(.custom("ClashDisplay-Regular", size: 18))
+                        Spacer()
+                        Button(action: {
+                            invitedFriends.removeAll { $0 == email }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                }
             }
+            
+            Spacer()
+            
+            Button(action: sendInvite) {
+                if isInviting {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Text("Send Invite")
+                        .font(.custom("ClashDisplay-Semibold", size: 18))
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.accentColor)
+            .cornerRadius(10)
+            .disabled(friendEmail.isEmpty || invitedFriends.count >= 5 || isInviting)
+        }
+        .padding()
+        .navigationBarTitle("Invite Friends", displayMode: .inline)
+        .navigationBarItems(trailing: Button("Done") {
+            presentationMode.wrappedValue.dismiss()
+        })
+        .alert(isPresented: $showingAlert) {
+            Alert(title: Text("Invitation"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+        }
+        .sheet(isPresented: $showingContactPicker) {
+            ContactPicker(email: $friendEmail)
         }
     }
     
     private func sendInvite() {
-        inviteFriend(friendEmail) { success in
+        let lowercaseEmail = friendEmail.lowercased()
+        if invitedFriends.contains(lowercaseEmail) {
+            alertMessage = "This friend has already been invited."
+            showingAlert = true
+            return
+        }
+        
+        if invitedFriends.count >= 5 {
+            alertMessage = "You can only invite up to 5 friends."
+            showingAlert = true
+            return
+        }
+        
+        isInviting = true
+        inviteFriend(lowercaseEmail) { success in
+            isInviting = false
             if success {
+                invitedFriends.append(lowercaseEmail)
                 alertMessage = "Invitation sent successfully"
+                friendEmail = ""
             } else {
-                alertMessage = "Failed to send invitation"
+                alertMessage = "User not found or failed to send invitation"
             }
             showingAlert = true
-            friendEmail = ""
+        }
+    }
+}
+
+struct ContactPicker: UIViewControllerRepresentable {
+    @Binding var email: String
+    
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.delegate = context.coordinator
+        picker.predicateForEnablingContact = NSPredicate(format: "emailAddresses.@count > 0")
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, CNContactPickerDelegate {
+        var parent: ContactPicker
+        
+        init(_ parent: ContactPicker) {
+            self.parent = parent
+        }
+        
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+            if let email = contact.emailAddresses.first?.value as String? {
+                parent.email = email.lowercased()
+            }
         }
     }
 }
