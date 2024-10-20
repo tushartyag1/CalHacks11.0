@@ -21,18 +21,28 @@ struct Invitation: Identifiable, Codable {
 class InvitationManager {
     private let db = Firestore.firestore()
     
+<<<<<<< HEAD
     func sendInvitation(tripId: String, inviterId: String, inviterName: String, inviteeEmail: String, tripName: String, completion: @escaping (Error?) -> Void) {
+=======
+    func sendInvitation(tripId: String, inviterId: String, inviteeEmail: String, tripName: String, completion: @escaping (Error?) -> Void) {
+        // Get the invitee's user ID from their email
+>>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
         getUserIdFromEmail(inviteeEmail) { [weak self] inviteeId in
             guard let inviteeId = inviteeId else {
                 completion(NSError(domain: "InvitationManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "Invitee not found"]))
                 return
             }
             
+            // We already have the inviter's ID, no need to fetch it
             let invitation = Invitation(
                 id: UUID().uuidString,
                 tripId: tripId,
+<<<<<<< HEAD
                 inviterId: inviterId,
                 inviterName: inviterName,
+=======
+                inviterId: inviterId,  // Use the inviterId directly
+>>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
                 inviteeId: inviteeId,
                 status: "pending",
                 tripName: tripName

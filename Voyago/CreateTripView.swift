@@ -207,7 +207,11 @@ class CreateTripViewModel: ObservableObject {
             return
         }
         
+<<<<<<< HEAD
         invitationManager.sendInvitation(tripId: self.tripId, inviterId: creatorId, inviterName: creatorName, inviteeEmail: email, tripName: selectedPlace?.name ?? "") { [weak self] error in
+=======
+        invitationManager.sendInvitation(tripId: self.tripId, inviterId: creatorId, inviteeEmail: email, tripName: selectedPlace?.name ?? "") { [weak self] error in
+>>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
             if let error = error {
                 print("Error sending invitation: \(error.localizedDescription)")
                 completion(false)

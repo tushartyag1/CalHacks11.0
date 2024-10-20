@@ -228,6 +228,25 @@ class TripDetailViewModel: ObservableObject {
         }
     }
     
+<<<<<<< HEAD
+=======
+    func inviteFriend(email: String, completion: @escaping (Bool) -> Void) {
+        guard let tripId = trip?.id, let inviterId = Auth.auth().currentUser?.uid else {
+            completion(false)
+            return
+        }
+        
+        invitationManager.sendInvitation(tripId: tripId, inviterId: inviterId, inviteeEmail: email, tripName: trip?.place.name ?? "") { [weak self] error in
+            if let error = error {
+                print("Error sending invitation: \(error.localizedDescription)")
+            } else {
+                print("Invitation sent successfully")
+            }
+        }
+
+    }
+    
+>>>>>>> fa5e609f915e237a4f9929144ae6cc12ddd193a5
     func submitPreferences(preferences: TripDetails) {
         tripDetailsManager.updateTripDetails(tripDetails: preferences) { [weak self] error in
             if let error = error {
