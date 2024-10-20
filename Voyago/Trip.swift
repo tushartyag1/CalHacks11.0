@@ -8,97 +8,73 @@
 import FirebaseFirestore
 import GooglePlaces
 
+struct PlaceDetails: Codable {
+    let name: String?
+    let formattedAddress: String?
+    // Add any other properties that you expect to be in the place data
+    // If some properties might be missing, make them optional with '?'
+    
+    // Custom coding keys in case the Firebase data uses different key names
+    enum CodingKeys: String, CodingKey {
+        case name
+        case formattedAddress = "formatted_address"
+        // Add other cases as needed
+    }
+}
+
 struct Trip: Identifiable {
     let id: String
     let creatorId: String
     let place: PlaceDetails
-    let duration: Int
+    let startDate: Date
+    let endDate: Date
     var participants: [String]
     var itinerary: [String]
     var sharedNotes: String
-}
-
-struct PlaceDetails: Codable {
-    let name: String
-    let address: String
-    let latitude: Double
-    let longitude: Double
-    let types: [String]
-    let priceLevel: Int
-    let rating: Double
+    
+    var formattedDuration: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
+    }
 }
 
 class TripManager {
     private let db = Firestore.firestore()
     
-    func createTrip(creatorId: String, place: GMSPlace, duration: Int, completion: @escaping (String?, Error?) -> Void) {
+    func createTrip(creatorId: String, place: GMSPlace, startDate: Date, endDate: Date, completion: @escaping (String?, Error?) -> Void) {
         let tripRef = db.collection("trips").document()
         
-        let placeDetails = PlaceDetails(
-            name: place.name ?? "",
-            address: place.formattedAddress ?? "",
-            latitude: place.coordinate.latitude,
-            longitude: place.coordinate.longitude,
-            types: place.types ?? [],
-            priceLevel: Int(place.priceLevel.rawValue),
-            rating: Double(place.rating ?? 0)
-        )
+        let placeData: [String: Any] = [
+            "name": place.name ?? "",
+            "formatted_address": place.formattedAddress ?? "",
+            // Add any other place details you want to save
+        ]
         
-        do {
-            let placeData = try Firestore.Encoder().encode(placeDetails)
-            
-            tripRef.setData([
-                "creatorId": creatorId,
-                "place": placeData,
-                "duration": duration,
-                "participants": [creatorId],
-                "itinerary": [],
-                "sharedNotes": ""
-            ]) { error in
-                if let error = error {
-                    completion(nil, error)
-                } else {
-                    completion(tripRef.documentID, nil)
-                }
+        let data: [String: Any] = [
+            "creatorId": creatorId,
+            "place": placeData,
+            "startDate": Timestamp(date: startDate),
+            "endDate": Timestamp(date: endDate),
+            "participants": [creatorId],
+            "itinerary": [],
+            "sharedNotes": ""
+        ]
+        
+        tripRef.setData(data) { error in
+            if let error = error {
+                completion(nil, error)
+            } else {
+                completion(tripRef.documentID, nil)
             }
-        } catch {
-            completion(nil, error)
         }
     }
     
-    func getTrip(tripId: String, completion: @escaping (Trip?, Error?) -> Void) {
-        let tripRef = db.collection("trips").document(tripId)
-        tripRef.getDocument { (document, error) in
-            if let document = document, document.exists {
-                do {
-                    let data = document.data()
-                    let placeData = data?["place"] as? [String: Any] ?? [:]
-                    let placeDetails = try Firestore.Decoder().decode(PlaceDetails.self, from: placeData)
-                    
-                    let trip = Trip(
-                        id: tripId,
-                        creatorId: data?["creatorId"] as? String ?? "",
-                        place: placeDetails,
-                        duration: data?["duration"] as? Int ?? 0,
-                        participants: data?["participants"] as? [String] ?? [],
-                        itinerary: data?["itinerary"] as? [String] ?? [],
-                        sharedNotes: data?["sharedNotes"] as? String ?? ""
-                    )
-                    completion(trip, nil)
-                } catch {
-                    completion(nil, error)
-                }
-            } else {
-                completion(nil, error)
-            }
-        }
-    }
-
     func listenForTripUpdates(tripId: String, completion: @escaping (Trip?) -> Void) -> ListenerRegistration {
         let tripRef = db.collection("trips").document(tripId)
         return tripRef.addSnapshotListener { documentSnapshot, error in
             guard let document = documentSnapshot else {
-                print("Error fetching document: \(error!)")
+                print("Error fetching document: \(error?.localizedDescription ?? "Unknown error")")
                 completion(nil)
                 return
             }
@@ -109,13 +85,15 @@ class TripManager {
             }
             do {
                 let placeData = data["place"] as? [String: Any] ?? [:]
+                print("Place data: \(placeData)") // Debug print
                 let placeDetails = try Firestore.Decoder().decode(PlaceDetails.self, from: placeData)
                 
                 let trip = Trip(
                     id: tripId,
                     creatorId: data["creatorId"] as? String ?? "",
                     place: placeDetails,
-                    duration: data["duration"] as? Int ?? 0,
+                    startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                    endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                     participants: data["participants"] as? [String] ?? [],
                     itinerary: data["itinerary"] as? [String] ?? [],
                     sharedNotes: data["sharedNotes"] as? String ?? ""
@@ -123,17 +101,18 @@ class TripManager {
                 completion(trip)
             } catch {
                 print("Error decoding place details: \(error)")
+                print("Raw place data: \(data["place"] ?? "No place data")")
                 completion(nil)
             }
         }
     }
-
+    
     func listenForUserTrips(userId: String, completion: @escaping ([Trip]) -> Void) -> ListenerRegistration {
         return db.collection("trips")
             .whereField("participants", arrayContains: userId)
             .addSnapshotListener { querySnapshot, error in
                 guard let documents = querySnapshot?.documents else {
-                    print("Error fetching documents: \(error!)")
+                    print("Error fetching documents: \(error?.localizedDescription ?? "Unknown error")")
                     return
                 }
                 let trips = documents.compactMap { document -> Trip? in
@@ -146,13 +125,14 @@ class TripManager {
                             id: document.documentID,
                             creatorId: data["creatorId"] as? String ?? "",
                             place: placeDetails,
-                            duration: data["duration"] as? Int ?? 0,
+                            startDate: (data["startDate"] as? Timestamp)?.dateValue() ?? Date(),
+                            endDate: (data["endDate"] as? Timestamp)?.dateValue() ?? Date(),
                             participants: data["participants"] as? [String] ?? [],
                             itinerary: data["itinerary"] as? [String] ?? [],
                             sharedNotes: data["sharedNotes"] as? String ?? ""
                         )
                     } catch {
-                        print("Error decoding place details: \(error)")
+                        print("Error decoding place details for trip \(document.documentID): \(error)")
                         return nil
                     }
                 }

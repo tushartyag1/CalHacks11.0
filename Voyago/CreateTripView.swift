@@ -9,6 +9,8 @@ import SwiftUI
 import FirebaseAuth
 import GooglePlaces
 
+// MARK: - CreateTripView
+
 struct CreateTripView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var viewModel = CreateTripViewModel()
@@ -20,6 +22,14 @@ struct CreateTripView: View {
                 selectedPlaceSection
                 tripDetailsSection
                 createTripButton
+                
+                if !viewModel.invitations.isEmpty {
+                    Section(header: Text("Invitations Sent")) {
+                        ForEach(viewModel.invitations, id: \.self) { email in
+                            Text(email)
+                        }
+                    }
+                }
             }
             .navigationTitle("Create Trip")
             .alert(item: $viewModel.errorWrapper) { errorWrapper in
@@ -27,13 +37,15 @@ struct CreateTripView: View {
             }
         }
         .sheet(isPresented: $viewModel.showingInviteView) {
-            InviteFriendsView(tripId: $viewModel.tripId)
+            InviteFriendsView(tripId: viewModel.tripId) { email, completion in
+                viewModel.inviteFriend(email: email, completion: completion)
+            }
         }
     }
     
     private var searchSection: some View {
-        Section(header: Text("Search for a Place")) {
-            TextField("Search", text: $viewModel.searchText)
+        Section(header: Text("Search for a City")) {
+            TextField("Enter city name", text: $viewModel.searchText)
                 .onChange(of: viewModel.searchText) { newValue in
                     viewModel.searchPlaces(query: newValue)
                 }
@@ -58,11 +70,11 @@ struct CreateTripView: View {
     private var selectedPlaceSection: some View {
         Group {
             if let place = viewModel.selectedPlace {
-                Section(header: Text("Selected Place")) {
+                Section(header: Text("Selected City")) {
                     Text(place.name ?? "")
                     Text(place.formattedAddress ?? "")
                     if let photos = place.photos, !photos.isEmpty {
-                        PlacePhotoView(photoMetadata: photos[0])
+                        PlacePhotosView(photoMetadata: Array(photos.prefix(5)))
                             .frame(height: 200)
                     }
                     placeTypesView(for: place)
@@ -89,14 +101,27 @@ struct CreateTripView: View {
             }
         }
     }
-
+    
     private func priceLevelView(for place: GMSPlace) -> some View {
         Group {
             let priceLevel = place.priceLevel
-            Text("Price Level: \(String(repeating: "$", count: Int(priceLevel.rawValue)))")
+            switch priceLevel {
+            case .free:
+                Text("Price Level: Free")
+            case .cheap:
+                Text("Price Level: $")
+            case .medium:
+                Text("Price Level: $$")
+            case .high:
+                Text("Price Level: $$$")
+            case .expensive:
+                Text("Price Level: $$$$")
+            @unknown default:
+                Text("Price Level: Unknown")
+            }
         }
     }
-
+    
     private func ratingView(for place: GMSPlace) -> some View {
         Group {
             let rating = place.rating
@@ -112,7 +137,8 @@ struct CreateTripView: View {
         Group {
             if viewModel.selectedPlace != nil {
                 Section(header: Text("Trip Details")) {
-                    Stepper("Duration: \(viewModel.duration) days", value: $viewModel.duration, in: 1...30)
+                    DatePicker("Start Date", selection: $viewModel.startDate, in: Date()..., displayedComponents: .date)
+                    DatePicker("End Date", selection: $viewModel.endDate, in: viewModel.startDate..., displayedComponents: .date)
                 }
             }
         }
@@ -129,20 +155,45 @@ struct CreateTripView: View {
     }
 }
 
+// MARK: - CreateTripViewModel
+
 class CreateTripViewModel: ObservableObject {
     @Published var searchText = ""
     @Published var selectedPlace: GMSPlace?
-    @Published var duration = 1
+    @Published var tripId: String = ""
     @Published var showingInviteView = false
-    @Published var tripId: String?
     @Published var errorWrapper: ErrorWrapper?
     @Published var predictions: [GMSAutocompletePrediction] = []
+    @Published var trip: Trip?
+    @Published var invitations: [String] = []
+    
+    @Published var startDate: Date {
+        didSet {
+            if endDate < startDate {
+                endDate = startDate
+            }
+        }
+    }
+    
+    @Published var endDate: Date {
+        didSet {
+            if endDate < startDate {
+                endDate = startDate
+            }
+        }
+    }
     
     private let tripManager = TripManager()
     private let placesManager = PlacesManager.shared
+    private let invitationManager = InvitationManager()
+    
+    init() {
+        self.startDate = Date()
+        self.endDate = Date()
+    }
     
     func searchPlaces(query: String) {
-        placesManager.findPlaces(query: query) { results in
+        placesManager.findCities(query: query) { results in
             DispatchQueue.main.async {
                 self.predictions = results
             }
@@ -166,72 +217,74 @@ class CreateTripViewModel: ObservableObject {
         }
         
         print("Creating trip for user: \(userId)")
-        tripManager.createTrip(creatorId: userId, place: place, duration: duration) { (newTripId, error) in
+        tripManager.createTrip(creatorId: userId, place: place, startDate: startDate, endDate: endDate) { [weak self] (newTripId, error) in
             DispatchQueue.main.async {
                 if let error = error {
                     print("Error creating trip: \(error.localizedDescription)")
-                    self.errorWrapper = ErrorWrapper(error: error.localizedDescription)
+                    self?.errorWrapper = ErrorWrapper(error: error.localizedDescription)
                 } else if let newTripId = newTripId {
                     print("Trip created successfully with ID: \(newTripId)")
-                    self.tripId = newTripId
-                    self.showingInviteView = true
+                    self?.tripId = newTripId
+                    self?.showingInviteView = true
+                    
+                    // Fetch the created trip details
+                    self?.fetchTripDetails(tripId: newTripId)
                 } else {
                     print("Unknown error: No trip ID returned and no error")
-                    self.errorWrapper = ErrorWrapper(error: "Unknown error occurred")
+                    self?.errorWrapper = ErrorWrapper(error: "Unknown error occurred")
                 }
             }
         }
     }
+    
+    private func fetchTripDetails(tripId: String) {
+        _ = tripManager.listenForTripUpdates(tripId: tripId) { fetchedTrip in
+            DispatchQueue.main.async {
+                if let fetchedTrip = fetchedTrip {
+                    self.trip = fetchedTrip
+                } else {
+                    print("Failed to fetch trip details")
+                }
+            }
+        }
+    }
+    
+    func inviteFriend(email: String, completion: @escaping (Bool) -> Void) {
+        guard let creatorId = Auth.auth().currentUser?.uid else {
+            print("No user ID found")
+            completion(false)
+            return
+        }
+        
+        invitationManager.sendInvitation(tripId: self.tripId, inviterEmail: creatorId, inviteeEmail: email, tripName: selectedPlace?.name ?? "") { [weak self] error in
+            if let error = error {
+                print("Error sending invitation: \(error.localizedDescription)")
+                completion(false)
+            } else {
+                self?.invitations.append(email)
+                completion(true)
+            }
+        }
+    }
 }
 
-struct PlacePhotoView: View {
-    let photoMetadata: GMSPlacePhotoMetadata
-    @State private var image: UIImage?
-    
-    var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                ProgressView()
-            }
-        }
-        .onAppear(perform: loadImage)
-    }
-    
-    private func loadImage() {
-        GMSPlacesClient.shared().loadPlacePhoto(photoMetadata) { image, error in
-            if let error = error {
-                print("Error loading place photo: \(error.localizedDescription)")
-            } else if let image = image {
-                self.image = image
-            }
-        }
-    }
-}
+// MARK: - InviteFriendsView
 
 struct InviteFriendsView: View {
-    @Binding var tripId: String?
+    let tripId: String
+    let inviteFriend: (String, @escaping (Bool) -> Void) -> Void
     @State private var friendEmail = ""
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
     @Environment(\.presentationMode) var presentationMode
-    
-    private let invitationManager = InvitationManager()
-    private let userManager = UserManager()
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Invite Friends")) {
-                    if let id = tripId {
-                        Text("Trip ID: \(id)")
-                        TextField("Friend's Email", text: $friendEmail)
-                        Button("Send Invite") {
-                            sendInvite()
-                        }
-                    } else {
-                        Text("No trip ID available")
+                    TextField("Friend's Email", text: $friendEmail)
+                    Button("Send Invite") {
+                        sendInvite()
                     }
                 }
             }
@@ -239,26 +292,21 @@ struct InviteFriendsView: View {
             .navigationBarItems(trailing: Button("Done") {
                 presentationMode.wrappedValue.dismiss()
             })
+            .alert(isPresented: $showingAlert) {
+                Alert(title: Text("Invitation"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+            }
         }
     }
     
     private func sendInvite() {
-        guard let tripId = tripId, let userId = Auth.auth().currentUser?.uid else { return }
-        
-        userManager.getUserIdByEmail(friendEmail) { friendUserId in
-            guard let friendUserId = friendUserId else {
-                print("User not found")
-                return
+        inviteFriend(friendEmail) { success in
+            if success {
+                alertMessage = "Invitation sent successfully"
+            } else {
+                alertMessage = "Failed to send invitation"
             }
-            
-            self.invitationManager.sendInvitation(tripId: tripId, inviterId: userId, inviteeId: friendUserId) { error in
-                if let error = error {
-                    print("Error sending invitation: \(error.localizedDescription)")
-                } else {
-                    print("Invitation sent successfully")
-                    self.friendEmail = ""
-                }
-            }
+            showingAlert = true
+            friendEmail = ""
         }
     }
 }

@@ -7,6 +7,8 @@
 
 import GooglePlaces
 
+// MARK: - PlacesManager
+
 class PlacesManager {
     static let shared = PlacesManager()
     private let client: GMSPlacesClient
@@ -15,9 +17,9 @@ class PlacesManager {
         client = GMSPlacesClient.shared()
     }
     
-    func findPlaces(query: String, completion: @escaping ([GMSAutocompletePrediction]) -> Void) {
+    func findCities(query: String, completion: @escaping ([GMSAutocompletePrediction]) -> Void) {
         let filter = GMSAutocompleteFilter()
-        filter.type = .establishment
+        filter.type = .city
         
         client.findAutocompletePredictions(fromQuery: query, filter: filter, sessionToken: nil) { (results, error) in
             guard error == nil else {
