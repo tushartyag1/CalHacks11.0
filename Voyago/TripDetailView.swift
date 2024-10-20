@@ -259,15 +259,14 @@ class TripDetailViewModel: ObservableObject {
             return
         }
         
-        invitationManager.sendInvitation(tripId: tripId, inviterEmail: inviterId, inviteeEmail: email, tripName: trip?.place.name ?? "") { [weak self] error in
+        invitationManager.sendInvitation(tripId: tripId, inviterId: inviterId, inviteeEmail: email, tripName: trip?.place.name ?? "") { [weak self] error in
             if let error = error {
                 print("Error sending invitation: \(error.localizedDescription)")
-                completion(false)
             } else {
-                self?.participantStatuses[email] = .inviteSent
-                completion(true)
+                print("Invitation sent successfully")
             }
         }
+
     }
     
     func submitPreferences(preferences: TripDetails) {
